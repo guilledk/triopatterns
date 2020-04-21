@@ -111,6 +111,23 @@ class AsyncQueue:
         finally:
             self.unmod(mod)
 
+
+    @asynccontextmanager
+    async def observe(self, history=False):
+        try:
+            obsv = await self.sub(
+                lambda *args: True,
+                history=history
+                )
+
+            yield obsv["queue"]
+        finally:
+            self.unsub(obsv)
+
+    """
+    send & recv
+    """
+
     async def send(self, msg):
 
         self.history.append(msg)
