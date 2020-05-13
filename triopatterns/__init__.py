@@ -3,6 +3,8 @@
 import trio
 import math
 
+from typing import Callable, List, Dict, Any
+
 from contextlib import asynccontextmanager
 
 
@@ -10,15 +12,15 @@ class AsyncQueue:
 
     def __init__(self):
         self.inport, self.outport = trio.open_memory_channel(math.inf)
-        self.history = []
-        self.subs = []  # subscribers match and relay messages
-        self.mods = []  # modifiers match, modify and relay messages
+        self.history: List[Any] = []
+        self.subs: List[Dict] = []  # subscribers match and relay messages
+        self.mods: List[Dict] = []  # modifiers match, modify and relay messages
 
     """
     subscriber implementation
     """
 
-    def match_sub(self, sub) -> bool:
+    def match_sub(self, sub: Dict) -> bool:
         # match each message in history, and if matched save index
         matched_idxs = []
         for msg in self.history[sub["rptr"]:]:
@@ -29,7 +31,13 @@ class AsyncQueue:
 
         return matched_idxs
 
-    async def sub(self, match_cb, args=[], history=False):
+    async def sub(
+        self,
+        match_cb: Callable[[List], bool],
+        args: List = [],
+        history: bool = False
+            ):
+
         nsub = {
             "rptr": 0 if history else len(self.history),  # read pointer
             "match": match_cb,  # match callback
@@ -50,7 +58,13 @@ class AsyncQueue:
         self.subs.remove(sub)
 
     @asynccontextmanager
-    async def subscribe(self, matcher, args=[], history=False):
+    async def subscribe(
+        self,
+        matcher: Callable[[List], bool],
+        args: List = [],
+        history: bool = False
+            ):
+
         try:
             sub = await self.sub(
                 matcher,
@@ -65,7 +79,7 @@ class AsyncQueue:
     modifier implementation
     """
 
-    def match_mod(self, mod) -> bool:
+    def match_mod(self, mod: Dict) -> bool:
         # match each message in history, and if matched save index
         matched_idxs = []
         for msg in self.history[mod["rptr"]:]:
@@ -79,7 +93,13 @@ class AsyncQueue:
 
         return matched_idxs
 
-    async def mod(self, match_cb, args=[], history=False):
+    async def mod(
+        self,
+        match_cb: Callable[[List], bool],
+        args: List = [],
+        history: bool = False
+            ):
+
         nmod = {
             "rptr": 0 if history else len(self.history),
             "match": match_cb,
@@ -96,11 +116,16 @@ class AsyncQueue:
 
         return nmod
 
-    def unmod(self, mod):
+    def unmod(self, mod: Dict):
         self.mods.remove(mod)
 
     @asynccontextmanager
-    async def modify(self, matcher, args=[], history=False):
+    async def modify(
+        self,
+        matcher: Callable[[List], bool],
+        args: List = [],
+        history: bool = False
+            ):
         try:
             mod = await self.mod(
                 matcher,
@@ -113,7 +138,7 @@ class AsyncQueue:
 
 
     @asynccontextmanager
-    async def observe(self, history=False):
+    async def observe(self, history: bool = False):
         try:
             obsv = await self.sub(
                 lambda *args: True,
@@ -128,7 +153,7 @@ class AsyncQueue:
     send & recv
     """
 
-    async def send(self, msg):
+    async def send(self, msg: Any) -> None:
 
         self.history.append(msg)
 
@@ -151,7 +176,9 @@ class AsyncQueue:
         if not propagated:
             await self.inport.send(msg)
 
-    async def receive(self):
+        return None
+
+    async def receive(self) -> Any:
         return await self.outport.receive()
 
 
@@ -159,10 +186,10 @@ class SessionIDManager:
 
     def __init__(
         self,
-        prefix="",
-        subfix="",
-        start=0,
-        step=1
+        prefix: str = "",
+        subfix: str = "",
+        start: int = 0,
+        step: int = 1
             ):
 
         self.prefix = prefix
@@ -172,7 +199,7 @@ class SessionIDManager:
 
         self.last_id = None
 
-    def getid(self):
+    def getid(self) -> str:
         if self.last_id is None:
             self.last_id = self.start
 
