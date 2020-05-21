@@ -22,7 +22,7 @@ async def test_send_sub(nursery):
             history=True
                 ) as sub_queue:
 
-            for i in range(len(packets) // 2):
+            for i in range(len(packets)):
                 await sub_queue.receive()
 
         assert True
@@ -33,7 +33,7 @@ async def test_send_sub(nursery):
             history=True
                 ) as sub_queue:
 
-            for i in range(len(packets) // 2):
+            for i in range(len(packets)):
                 await sub_queue.receive()
 
         assert True
@@ -85,7 +85,9 @@ async def test_send_observe(nursery):
         assert True
 
     nursery.start_soon(producer)
-    nursery.start_soon(consumer)
+
+    for i in range(5):
+        nursery.start_soon(consumer)
 
 
 async def test_observe_history(nursery):

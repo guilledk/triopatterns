@@ -15,6 +15,7 @@ class AsyncQueue:
         self.history: List[Any] = []
         self.subs: List[Dict] = []  # subscribers match and relay msgs
         self.mods: List[Dict] = []  # modifiers match, modify and relay msgs
+        self.caps: List[Dict] = []  # captors match and caputre msgs
 
     """
     subscriber implementation
@@ -141,6 +142,8 @@ class AsyncQueue:
             if mod:
                 self.unmod(mod)
 
+    # observer
+
     @asynccontextmanager
     async def observe(self, history: bool = False):
         obsv = None
@@ -156,6 +159,46 @@ class AsyncQueue:
                 self.unsub(obsv)
 
     """
+    captor implementation
+    """
+
+    async def cap(
+        self,
+        match_cb: Callable[[List], bool],
+        args: List = []
+            ):
+
+        ncap = {
+            "match": match_cb,
+            "*args": args,
+            "queue": AsyncQueue()
+        }
+        self.caps.append(ncap)
+
+        return ncap
+
+    def uncap(self, cap: Dict):
+        self.caps.remove(cap)
+
+    @asynccontextmanager
+    async def capture(
+        self,
+        matcher: Callable[[List], bool],
+        args: List = []
+            ):
+
+        cap = None
+        try:
+            cap = await self.cap(
+                matcher,
+                args=args
+                )
+            yield cap["queue"]
+        finally:
+            if cap:
+                self.uncap(cap)
+
+    """
     send & recv
     """
 
@@ -163,21 +206,40 @@ class AsyncQueue:
 
         self.history.append(msg)
 
-        propagated = False
+        # captors
+        captured = False
 
+        for cap in self.caps:
+            result, capmsg = cap["match"](msg, *cap["*args"])
+            if result:
+                await cap["queue"].send(capmsg)
+                captured = True
+
+        propagated = captured
+
+        # subscribers
         for sub in self.subs:
-            matched = self.match_sub(sub)
-            if len(matched) > 0:
-                for idx in matched:
-                    await sub["queue"].send(self.history[idx])
-                propagated = True
+            if not captured:
+                matched = self.match_sub(sub)
+                if len(matched) > 0:
+                    for idx in matched:
+                        await sub["queue"].send(self.history[idx])
+                    propagated = True
 
+            else:
+                sub["rptr"] += 1
+
+        # modifiers
         for mod in self.mods:
-            matched = self.match_mod(mod)
-            if len(matched) > 0:
-                for idx, msg in matched:
-                    await mod["queue"].send(msg)
-                propagated = True
+            if not captured:
+                matched = self.match_mod(mod)
+                if len(matched) > 0:
+                    for idx, msg in matched:
+                        await mod["queue"].send(msg)
+                    propagated = True
+
+            else:
+                mod["rptr"] += 1
 
         if not propagated:
             await self.inport.send(msg)
