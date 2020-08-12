@@ -17,6 +17,17 @@ class AsyncQueue:
         self.mods: List[Dict] = []  # modifiers match, modify and relay msgs
         self.caps: List[Dict] = []  # captors match and caputre msgs
 
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        data = await self.receive()
+        
+        if data:
+            return data
+        else:
+            raise StopAsyncIteration
+
     """
     subscriber implementation
     """

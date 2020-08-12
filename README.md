@@ -24,7 +24,8 @@ def matcher(*args):
 
 # msg_queue will receive all messages that contain the byte sequence "hello"
 async with inbound.subscribe(matcher) as msg_queue:
-    msg = await msg_queue.receive()
+    async for msg in msg_queue:
+        ...
 ```
 
 Send a message through:

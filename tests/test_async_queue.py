@@ -114,3 +114,18 @@ async def test_observe_history(nursery):
     await nursery.start(young_beholder)
 
     await root_queue.send("This is the third message")
+
+
+async def test_iterator():
+
+    numbers = range(10)
+
+    root_queue = AsyncQueue()
+
+    assert hasattr(root_queue, '__aiter__')
+
+    for num in numbers:
+        await root_queue.send(num)
+
+    async for num in root_queue:
+        assert num == numbers[num - 1]
